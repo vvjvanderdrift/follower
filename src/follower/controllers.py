@@ -6,64 +6,58 @@ from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker
 from simple_sim.msg import KinematicBicycleControl
 
+# class State:
 
-class PID:
+#     def __init__(self):
+#         # rospy.logdebug("State_init")
+        
 
-    def __init__(self) -> None:
-        print("Initializing PID controller")
 
+class Reference():
+
+    def __init__(self):
+        # rospy.logdebug("Reference_init")
         self.time_start = rospy.Time.now()
         self.time_now = rospy.Time.now()
 
-        self.odometry_msg = Odometry()
 
-        self.state_topic = "/kinematic_bicycle/state"
+        self.x = 0
+        self.y = 0
+        self.psi = 0
+
+
         self.reference_marker_topic = "/reference/reference_marker_msg"
-        self.control_topic = "/kinematic_bicycle/control"
-
-        rospy.Subscriber(self.state_topic, Odometry, self.control_callback)
         self.reference_marker_pub = rospy.Publisher(self.reference_marker_topic, Marker, queue_size=1)
-        self.control_pub = rospy.Publisher(self.control_topic, KinematicBicycleControl, queue_size=1)
-        pass
 
 
+    def generate(self):
 
-    def control_callback(self, odometry_msg):
-
-        self.odometry_msg = odometry_msg
-        self.frame_id = odometry_msg.header.frame_id
-
-
-        reference = self.generate_reference()
-        error = self.calculate_error(reference)
-        control_input = self.calculate_control(error)
-
-        self.publish_control(control_input)
-        
-        return
-
-    def generate_reference(self):
+        # reference = Reference()
 
         self.time_now = rospy.Time.now()
 
         time_since_start = self.time_now - self.time_start
+        t = time_since_start.to_sec()
 
-        # reference = np.sin(time_since_start)
-        reference = time_since_start.to_sec()
-        self.publish_refence_marker(reference)
-        print(f'Reference: {reference}')
+        self.x = t #(1 + np.cos(t)) * np.exp(t**.2)
+        self.y = 0
+        self.psi = 0
 
-        return reference
 
-    def publish_refence_marker(self,reference):
+        # self.publish_marker()
+        print(f'Reference(x,y,psi): {self.x, self.y, self.psi}')
+
+        return 
+
+    def publish_marker(self, frame_id):
         
         reference_marker_msg = Marker()
         
-        reference_marker_msg.header.frame_id = self.frame_id
+        reference_marker_msg.header.frame_id = frame_id
         reference_marker_msg.header.stamp = rospy.Time.now()
         reference_marker_msg.type = 2
-        reference_marker_msg.pose.position.x = reference
-        reference_marker_msg.pose.position.y = 0
+        reference_marker_msg.pose.position.x = self.x
+        reference_marker_msg.pose.position.y = self.y
         reference_marker_msg.pose.position.z = 0
         reference_marker_msg.pose.orientation.x = 0.0
         reference_marker_msg.pose.orientation.y = 0.0
@@ -82,19 +76,56 @@ class PID:
         return
 
 
-    def calculate_error(self,reference):
+
+class PID:
+
+    def __init__(self) -> None:
+        print("Initializing PID controller")
+
+        self.odometry_msg = Odometry()
+
+        self.reference = Reference()
+
+        self.state_topic = "/kinematic_bicycle/state"
+        self.control_topic = "/kinematic_bicycle/control"
+
+        rospy.Subscriber(self.state_topic, Odometry, self.control_callback)
+        self.control_pub = rospy.Publisher(self.control_topic, KinematicBicycleControl, queue_size=1)
+        pass
+
+
+    def control_callback(self, odometry_msg):
+
+        self.odometry_msg = odometry_msg
+        self.frame_id = odometry_msg.header.frame_id
+
+        # reference = Reference()
+        self.reference.generate()
+        self.reference.publish_marker(self.frame_id)
+
+        error = self.calculate_error(self.reference)
+        control_input = self.calculate_control(error)
+
+        self.publish_control(control_input)
+        
+        return
+
+
+    def calculate_error(self, reference):
+
 
         state = self.odometry_msg.pose.pose.position.x
         
-        error = reference - state
+        error = reference.x - state
 
         return error
 
     def calculate_control(self, error):
+
         
         proportional = 1
 
-        control_input = [proportional * error, 0]
+        control_input = [proportional * error, 0.0]
 
         return control_input
 
@@ -110,5 +141,4 @@ class PID:
         self.control_pub.publish(control_msg)
 
         
-
         return
