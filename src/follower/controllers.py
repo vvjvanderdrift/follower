@@ -25,8 +25,9 @@ class Reference():
         self.y = 0
         self.psi = 0
 
-
-        self.reference_marker_topic = "/reference/reference_marker_msg"
+        self.reference_marker_msg = Marker()
+        
+        self.reference_marker_topic = "/reference/reference_marker"
         self.reference_marker_pub = rospy.Publisher(self.reference_marker_topic, Marker, queue_size=1)
 
 
@@ -39,8 +40,8 @@ class Reference():
         time_since_start = self.time_now - self.time_start
         t = time_since_start.to_sec()
 
-        self.x = t #(1 + np.cos(t)) * np.exp(t**.2)
-        self.y = 0
+        self.x = t**1.4 #(1 + np.cos(t)) * np.exp(t**.2)
+        self.y = t**.5*np.sin(t)
         self.psi = 0
 
 
@@ -49,29 +50,27 @@ class Reference():
 
         return 
 
-    def publish_marker(self, frame_id):
+    def publish_current_marker(self, frame_id):
         
-        reference_marker_msg = Marker()
-        
-        reference_marker_msg.header.frame_id = frame_id
-        reference_marker_msg.header.stamp = rospy.Time.now()
-        reference_marker_msg.type = 2
-        reference_marker_msg.pose.position.x = self.x
-        reference_marker_msg.pose.position.y = self.y
-        reference_marker_msg.pose.position.z = 0
-        reference_marker_msg.pose.orientation.x = 0.0
-        reference_marker_msg.pose.orientation.y = 0.0
-        reference_marker_msg.pose.orientation.z = 0.0
-        reference_marker_msg.pose.orientation.w = 1.0
-        reference_marker_msg.scale.x = 0.25
-        reference_marker_msg.scale.y = 0.25
-        reference_marker_msg.scale.z = 0.25
-        reference_marker_msg.color.a = 1.0 
-        reference_marker_msg.color.r = 0.0
-        reference_marker_msg.color.g = 1.0
-        reference_marker_msg.color.b = 1.0
+        self.reference_marker_msg.header.frame_id = frame_id
+        self.reference_marker_msg.header.stamp = rospy.Time.now()
+        self.reference_marker_msg.type = 2
+        self.reference_marker_msg.pose.position.x = self.x
+        self.reference_marker_msg.pose.position.y = self.y
+        self.reference_marker_msg.pose.position.z = 0
+        self.reference_marker_msg.pose.orientation.x = 0.0
+        self.reference_marker_msg.pose.orientation.y = 0.0
+        self.reference_marker_msg.pose.orientation.z = 0.0
+        self.reference_marker_msg.pose.orientation.w = 1.0
+        self.reference_marker_msg.scale.x = 0.25
+        self.reference_marker_msg.scale.y = 0.25
+        self.reference_marker_msg.scale.z = 0.25
+        self.reference_marker_msg.color.a = 1.0 
+        self.reference_marker_msg.color.r = 0.0
+        self.reference_marker_msg.color.g = 1.0
+        self.reference_marker_msg.color.b = 1.0
 
-        self.reference_marker_pub.publish(reference_marker_msg)
+        self.reference_marker_pub.publish(self.reference_marker_msg)
 
         return
 
@@ -101,31 +100,31 @@ class PID:
 
         # reference = Reference()
         self.reference.generate()
-        self.reference.publish_marker(self.frame_id)
+        self.reference.publish_current_marker(self.frame_id)
 
-        error = self.calculate_error(self.reference)
-        control_input = self.calculate_control(error)
+        control_input = self.calculate_control(self.reference)
+        # control_input = self.calculate_control(error)
 
         self.publish_control(control_input)
         
         return
 
 
-    def calculate_error(self, reference):
+    def calculate_control(self, reference):
 
+        error_x = reference.x - self.odometry_msg.pose.pose.position.x
+        error_y = reference.y - self.odometry_msg.pose.pose.position.y
+        error_psi = reference.psi - self.odometry_msg.pose.pose.orientation.z
 
-        state = self.odometry_msg.pose.pose.position.x
+        # Longitudinal PID
+        proportional = 5
+        speed = proportional * error_x
+
+        # Lateral Stanley
+        gain = 5
+        steering_angle = error_psi + np.arctan2(gain*error_y,speed)
         
-        error = reference.x - state
-
-        return error
-
-    def calculate_control(self, error):
-
-        
-        proportional = 1
-
-        control_input = [proportional * error, 0.0]
+        control_input = [speed, steering_angle]
 
         return control_input
 
