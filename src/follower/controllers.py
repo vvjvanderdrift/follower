@@ -1,6 +1,7 @@
 import numpy as np
 
 import rospy
+import tf_conversions
 
 from nav_msgs.msg import Odometry
 from nav_msgs.msg import Path
@@ -35,15 +36,32 @@ class Reference():
         self.time_start = rospy.Time.now()
         self.time_now = rospy.Time.now()
 
-        self.path = Path()
+        self.path = []
 
         self.reference_marker_msg = Marker()
         
+        self.roadmap_topic = "/roadmap/reference"
+        rospy.Subscriber(self.roadmap_topic, Path, self.roadmap_callback)
         self.reference_marker_topic = "/reference/reference_marker"
         self.reference_marker_pub = rospy.Publisher(self.reference_marker_topic, Marker, queue_size=1)
 
         pass
 
+    def roadmap_callback(self, roadmap_reference_msg):
+
+        # path_msg = Path()
+        path = []
+
+        poses = roadmap_reference_msg.poses
+
+        for pose in poses:
+            x = pose.pose.position.x
+            y = pose.pose.position.y
+            path.append(Node(x,y,0))
+
+        self.path = path
+
+        return 
 
     def generate_closest_node(self):
 
@@ -65,9 +83,10 @@ class Reference():
 
     def calculate_closest_node(self, ego_state):
         
-        path = []
-        for x in np.arange(1000):
-            path.append(Node(x*1,np.sin(x),0))
+        if self.path:
+            path = self.path
+        else:
+            path = self.generate_path()
 
         look_over_distance = 2
 
@@ -87,6 +106,17 @@ class Reference():
                 closest_node = node
 
         return closest_node
+
+    def generate_path(self):
+        
+        path = []
+
+        # path.append(Node(0,0,0))
+        
+        for x in np.arange(1000):
+            path.append(Node(x*1,np.sin(x),0))
+        
+        return path
 
     def publish_node_marker(self, frame_id, node):
         
@@ -150,26 +180,35 @@ class PID:
 
         self.ego_state.x = odometry_msg.pose.pose.position.x
         self.ego_state.y = odometry_msg.pose.pose.position.y
+        q = [odometry_msg.pose.pose.orientation.x, odometry_msg.pose.pose.orientation.y, odometry_msg.pose.pose.orientation.z, odometry_msg.pose.pose.orientation.w]
+        (roll, pitch, yaw) = tf_conversions.transformations.euler_from_quaternion(q)
+
+        self.ego_state.psi = yaw
 
         return
 
     def calculate_control(self, closest_node):
 
-        error_x = closest_node.x - self.ego_state.x
-        error_y = closest_node.y - self.ego_state.y
+        error_x_global = closest_node.x - self.ego_state.x
+        error_y_global = closest_node.y - self.ego_state.y
+
+        error_x_ego = error_x_global*np.cos(self.ego_state.psi) + error_y_global*np.sin(self.ego_state.psi)
+        error_y_ego = -error_x_global*np.sin(self.ego_state.psi) + error_y_global*np.cos(self.ego_state.psi)
+            
+
         error_psi = 0 
 
         # Longitudinal PID
-        speed_ref = 8 / 3.6 # Reference speed 
+        speed_ref = 0 / 3.6 # Reference speed 
         proportional = 5
-        speed = speed_ref + proportional * error_x
+        speed = speed_ref + proportional * error_x_ego
 
-        max_speed = 10 / 3.6
+        max_speed = 40 / 3.6
         speed = min(speed,max_speed)
 
         # Lateral Stanley
-        gain = 2
-        steering_angle = error_psi + np.arctan2(gain*error_y,speed)
+        gain = 1
+        steering_angle = error_psi + np.arctan2(gain*error_y_ego,speed)
         
         control_input = [speed, steering_angle]
 
