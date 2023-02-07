@@ -3,60 +3,98 @@ import numpy as np
 import rospy
 
 from nav_msgs.msg import Odometry
+from nav_msgs.msg import Path
 from visualization_msgs.msg import Marker
 from simple_sim.msg import KinematicBicycleControl
 
-# class State:
 
-#     def __init__(self):
-#         # rospy.logdebug("State_init")
-        
+class Node():
+
+    def __init__(self, x=0, y=0, psi=0):
+
+        self.x = x
+        self.y = y
+        self.psi = psi
+
+        pass
+
+
+    def update_pose(self, Pose):
+
+        self.x = Pose.Point.x
+        self.y = Pose.Point.y
+        self.psi = 0 # TODO: Yaw not defined yet
+
+        return
 
 
 class Reference():
 
     def __init__(self):
-        # rospy.logdebug("Reference_init")
+        
         self.time_start = rospy.Time.now()
         self.time_now = rospy.Time.now()
 
-
-        self.x = 0
-        self.y = 0
-        self.psi = 0
+        self.path = Path()
 
         self.reference_marker_msg = Marker()
         
         self.reference_marker_topic = "/reference/reference_marker"
         self.reference_marker_pub = rospy.Publisher(self.reference_marker_topic, Marker, queue_size=1)
 
+        pass
 
-    def generate(self):
 
-        # reference = Reference()
+    def generate_closest_node(self):
 
         self.time_now = rospy.Time.now()
 
         time_since_start = self.time_now - self.time_start
         t = time_since_start.to_sec()
 
-        self.x = t**1.4 #(1 + np.cos(t)) * np.exp(t**.2)
-        self.y = t**.5*np.sin(t)
-        self.psi = 0
+        # self.x = t**1.4 #(1 + np.cos(t)) * np.exp(t**.2)
+        # self.y = t**.5*np.sin(t)
+        # self.psi = 0
+        closest_node = Node(2*t,.5*np.sin(t),0)
 
+        # self.closest_node.x = 2*t
+        # self.closest_node.y = .5*np.sin(t)
+        # self.closest_node.psi = 0
 
-        # self.publish_marker()
-        print(f'Reference(x,y,psi): {self.x, self.y, self.psi}')
+        return closest_node
 
-        return 
+    def calculate_closest_node(self, ego_state):
+        
+        path = []
+        for x in np.arange(1000):
+            path.append(Node(x*1,np.sin(x),0))
 
-    def publish_current_marker(self, frame_id):
+        look_over_distance = 2
+
+        closest_node = Node(np.inf,np.inf,0)
+        distances = []
+        for node in path:
+            dx = node.x-ego_state.x
+            dy = node.y-ego_state.y
+            dx_ego = dx*np.cos(ego_state.psi) + dy*np.sin(ego_state.psi)
+            dy_ego = -dx*np.sin(ego_state.psi) + dy*np.cos(ego_state.psi)
+            distance_node = np.hypot(dx, dy)
+            distance_closest_node = np.hypot(closest_node.x-ego_state.x,closest_node.y-ego_state.y)
+            
+            node_in_front = dx_ego > look_over_distance
+            node_closer_than_closest = distance_node < distance_closest_node
+            if node_in_front and node_closer_than_closest:
+                closest_node = node
+
+        return closest_node
+
+    def publish_node_marker(self, frame_id, node):
         
         self.reference_marker_msg.header.frame_id = frame_id
         self.reference_marker_msg.header.stamp = rospy.Time.now()
         self.reference_marker_msg.type = 2
-        self.reference_marker_msg.pose.position.x = self.x
-        self.reference_marker_msg.pose.position.y = self.y
+        self.reference_marker_msg.pose.position.x = node.x
+        self.reference_marker_msg.pose.position.y = node.y
         self.reference_marker_msg.pose.position.z = 0
         self.reference_marker_msg.pose.orientation.x = 0.0
         self.reference_marker_msg.pose.orientation.y = 0.0
@@ -75,15 +113,14 @@ class Reference():
         return
 
 
-
 class PID:
 
     def __init__(self) -> None:
         print("Initializing PID controller")
 
-        self.odometry_msg = Odometry()
-
         self.reference = Reference()
+
+        self.ego_state = Node()
 
         self.state_topic = "/kinematic_bicycle/state"
         self.control_topic = "/kinematic_bicycle/control"
@@ -95,33 +132,43 @@ class PID:
 
     def control_callback(self, odometry_msg):
 
-        self.odometry_msg = odometry_msg
         self.frame_id = odometry_msg.header.frame_id
+        self.update_ego_state(odometry_msg)
 
-        # reference = Reference()
-        self.reference.generate()
-        self.reference.publish_current_marker(self.frame_id)
+        # closest_node = self.reference.generate_closest_node()
+        closest_node = self.reference.calculate_closest_node(self.ego_state)
+        self.reference.publish_node_marker(self.frame_id, closest_node)
 
-        control_input = self.calculate_control(self.reference)
-        # control_input = self.calculate_control(error)
+        control_input = self.calculate_control(closest_node)
 
         self.publish_control(control_input)
         
         return
 
 
-    def calculate_control(self, reference):
+    def update_ego_state(self,odometry_msg):
 
-        error_x = reference.x - self.odometry_msg.pose.pose.position.x
-        error_y = reference.y - self.odometry_msg.pose.pose.position.y
-        error_psi = reference.psi - self.odometry_msg.pose.pose.orientation.z
+        self.ego_state.x = odometry_msg.pose.pose.position.x
+        self.ego_state.y = odometry_msg.pose.pose.position.y
+
+        return
+
+    def calculate_control(self, closest_node):
+
+        error_x = closest_node.x - self.ego_state.x
+        error_y = closest_node.y - self.ego_state.y
+        error_psi = 0 
 
         # Longitudinal PID
+        speed_ref = 8 / 3.6 # Reference speed 
         proportional = 5
-        speed = proportional * error_x
+        speed = speed_ref + proportional * error_x
+
+        max_speed = 10 / 3.6
+        speed = min(speed,max_speed)
 
         # Lateral Stanley
-        gain = 5
+        gain = 2
         steering_angle = error_psi + np.arctan2(gain*error_y,speed)
         
         control_input = [speed, steering_angle]
