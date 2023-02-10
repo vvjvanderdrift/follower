@@ -7,22 +7,14 @@ from visualization_msgs.msg import Marker
 
 class Node():
 
-    def __init__(self, x=0, y=0, psi=0):
+    def __init__(self, x=0, y=0, psi=0, vx = 0):
 
         self.x = x
         self.y = y
         self.psi = psi
+        self.vx = vx
 
         pass
-
-
-    def update_pose(self, Pose):
-
-        self.x = Pose.Point.x
-        self.y = Pose.Point.y
-        self.psi = 0 # TODO: Yaw not defined yet
-
-        return
 
 
 class Reference():
@@ -45,7 +37,6 @@ class Reference():
 
     def roadmap_callback(self, roadmap_reference_msg):
 
-        # path_msg = Path()
         path = []
 
         poses = roadmap_reference_msg.poses
@@ -84,7 +75,7 @@ class Reference():
         else:
             path = self.generate_path()
 
-        look_over_distance = 2
+        look_over_distance = 3
 
         closest_node = Node(np.inf,np.inf,0)
         distances = []

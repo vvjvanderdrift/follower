@@ -6,4 +6,5 @@
 
     <include file="$(find simple_sim)/launch/simple_sim_rviz.launch"/>
 
+
 </launch>

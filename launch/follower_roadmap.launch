@@ -2,8 +2,11 @@
 
 <launch>
 
-    <include file="$(find follower)/launch/follower.launch"/>
+    <include file="$(find follower)/launch/follower.launch">
+    </include>
     
     <include file="$(find roadmap)/launch/roadmap.launch"/>
+
+    <!-- <include file="$(find pedestrian_simulator)/launch/simulation.launch"/> -->
 
 </launch>
