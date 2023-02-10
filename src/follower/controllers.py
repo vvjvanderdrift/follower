@@ -3,6 +3,7 @@ import numpy as np
 import rospy
 import tf_conversions
 
+from std_msgs.msg import Float32
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
 from simple_sim.msg import KinematicBicycleControl
@@ -15,24 +16,42 @@ class PID_Stanley:
     def __init__(self) -> None:
         print("Initializing PID controller")
 
+        self.instant_control = True
+
         self.reference = reference.Reference()
 
         self.ego_state = reference.Node()
         self.steering_angle = 0.0
 
+        self.previous_error_x_ego = 0.0
+        self.previous_error_steering_angle = 0.0
+
         self.state_topic = "/kinematic_bicycle/state"
         self.control_topic = "/kinematic_bicycle/control"
 
-        rospy.Subscriber(self.state_topic, Odometry, self.control_callback)
+        rospy.Subscriber(self.state_topic, Odometry, self.odometry_callback)
         rospy.Subscriber('/movebox/front_left_steer_joint', JointState, self.steer_callback)
         self.control_pub = rospy.Publisher(self.control_topic, KinematicBicycleControl, queue_size=1)
+        self.speed_value_pub = rospy.Publisher('/value/speed', Float32, queue_size=1)
+        self.steering_angle_value_pub = rospy.Publisher('/value/steering_angle', Float32, queue_size=1)
+        self.speed_reference_pub = rospy.Publisher('/value/speed_reference', Float32, queue_size=1)
+        self.steering_angle_reference_pub = rospy.Publisher('/value/steering_angle_reference', Float32, queue_size=1)
+
         pass
 
 
-    def control_callback(self, odometry_msg):
+    def odometry_callback(self, odometry_msg):
 
         self.frame_id = odometry_msg.header.frame_id
         self.update_ego_state(odometry_msg)
+
+        # TODO: Add timed callback
+        if(self.instant_control):
+            self.control()
+        
+        return
+
+    def control(self):
 
         goal_node = self.reference.calculate_closest_node(self.ego_state)
         self.reference.publish_node_marker(self.frame_id, goal_node)
@@ -40,7 +59,7 @@ class PID_Stanley:
         control_input = self.calculate_control(goal_node)
 
         self.publish_control(control_input)
-        
+
         return
 
     def steer_callback(self, jointstate_msg):
@@ -82,15 +101,17 @@ class PID_Stanley:
         # Longitudinal speed PID 
         # 50 k/h = 14 m/s
         speed_ref = 0 # Reference speed 
-        proportional = 1
-        control_speed = speed_ref + proportional * error_x_ego
+        proportional = 3
 
-        max_speed = 7
+        d_error_x_ego = error_x_ego - self.previous_error_x_ego
+        derivative = 0
+        control_speed = speed_ref + proportional * error_x_ego + derivative * d_error_x_ego
+
+        max_speed = 14
         control_speed = min(control_speed,max_speed)
 
-
         # Lateral Stanley
-        gain = 1
+        gain = 2
         control_steering_angle = error_psi + np.arctan2(gain*error_y_ego,control_speed)
         
         max_steering_angle = 30 * np.pi/180
@@ -98,17 +119,29 @@ class PID_Stanley:
         control_steering_angle = max(control_steering_angle, -max_steering_angle)
         
         # Longitudinal acceleration PID 
-        proportional = 1
+        proportional = 5
         control_acceleration = proportional * (control_speed - self.ego_state.vx)
 
         # Steering angle rate PID 
-        proportional = 1
-        control_steering_rate = proportional * (control_steering_angle - self.steering_angle)
+        error_steering_angle = (control_steering_angle - self.steering_angle)
+        d_error_steering_angle = error_steering_angle - self.previous_error_steering_angle
+        proportional = 8
+        derivative = 0
+        control_steering_rate = proportional * error_steering_angle + derivative * d_error_steering_angle
 
         # control_input = [speed, steering_angle]
         control_input = [control_acceleration, control_steering_rate]
 
-        rospy.logwarn(f'Control speed: {control_speed}, acceleration: {control_acceleration}, steering angle: {control_steering_angle}')
+        # rospy.logwarn(f'Control speed: {control_speed}, acceleration: {control_acceleration}, steering angle: {control_steering_angle}')
+
+
+        self.speed_value_pub.publish(Float32(self.ego_state.vx))
+        self.steering_angle_value_pub.publish(Float32(self.steering_angle * 180 / np.pi))
+        self.speed_reference_pub.publish(Float32(control_speed))
+        self.steering_angle_reference_pub.publish(Float32(control_steering_angle * 180 / np.pi))
+
+        self.previous_error_x_ego = error_x_ego
+        self.previous_error_steering_angle = error_steering_angle
 
         return control_input
 

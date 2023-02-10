@@ -6,5 +6,8 @@
 
     <include file="$(find simple_sim)/launch/simple_sim_rviz.launch"/>
 
-
+    <!-- Run rqt_plot -->
+    <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot_speed" args=" /value/speed, /value/speed_reference"/>
+    <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot_steering_angle" args=" /value/steering_angle, /value/steering_angle_reference"/>
+  
 </launch>

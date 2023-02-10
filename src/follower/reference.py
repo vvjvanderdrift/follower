@@ -25,6 +25,7 @@ class Reference():
         self.time_now = rospy.Time.now()
 
         self.path = []
+        self.previous_closest_node = Node()
 
         self.reference_marker_msg = Marker()
         
@@ -69,16 +70,18 @@ class Reference():
         return closest_node
 
     def calculate_closest_node(self, ego_state):
-        
+                
         if self.path:
             path = self.path
         else:
             path = self.generate_path()
 
-        look_over_distance = 3
-
         closest_node = Node(np.inf,np.inf,0)
-        distances = []
+        found_node = False
+
+        look_over_time = .5
+        look_over_distance = ego_state.vx * look_over_time 
+
         for node in path:
             dx = node.x-ego_state.x
             dy = node.y-ego_state.y
@@ -91,8 +94,14 @@ class Reference():
             node_closer_than_closest = distance_node < distance_closest_node
             if node_in_front and node_closer_than_closest:
                 closest_node = node
+                found_node = True
 
-        return closest_node
+        if(found_node): 
+            self.previous_closest_node = closest_node
+            return closest_node
+        else: 
+            return self.previous_closest_node
+
 
     def generate_path(self):
         
@@ -112,14 +121,14 @@ class Reference():
         self.reference_marker_msg.type = 2
         self.reference_marker_msg.pose.position.x = node.x
         self.reference_marker_msg.pose.position.y = node.y
-        self.reference_marker_msg.pose.position.z = 0
+        self.reference_marker_msg.pose.position.z = 1
         self.reference_marker_msg.pose.orientation.x = 0.0
         self.reference_marker_msg.pose.orientation.y = 0.0
         self.reference_marker_msg.pose.orientation.z = 0.0
         self.reference_marker_msg.pose.orientation.w = 1.0
-        self.reference_marker_msg.scale.x = 0.25
-        self.reference_marker_msg.scale.y = 0.25
-        self.reference_marker_msg.scale.z = 0.25
+        self.reference_marker_msg.scale.x = 1.0
+        self.reference_marker_msg.scale.y = 1.0
+        self.reference_marker_msg.scale.z = 1.0
         self.reference_marker_msg.color.a = 1.0 
         self.reference_marker_msg.color.r = 0.0
         self.reference_marker_msg.color.g = 1.0
