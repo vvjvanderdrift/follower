@@ -9,10 +9,18 @@ if __name__ == '__main__':
     
     try:
 
+        control_rate = 50 # Set to 0 for instant control as state message is arrived
+
         rospy.init_node('follower', anonymous=True)
 
-        controllers.PID_Stanley()
+        controller = controllers.PID_Stanley(control_rate)
 
+        if(control_rate):
+            rospy.Timer(rospy.Duration(1 / control_rate), controller.timer_callback)
+            rospy.loginfo(f"Started timed control loop")
+
+        else:
+            rospy.loginfo(f"Started untimed control loop")
         rospy.spin()
 
     except rospy.ROSInterruptException:

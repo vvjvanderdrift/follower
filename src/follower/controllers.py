@@ -13,12 +13,13 @@ from follower import reference
 
 class PID_Stanley:
 
-    def __init__(self) -> None:
+    def __init__(self, control_rate) -> None:
         print("Initializing PID controller")
 
-        self.instant_control = True
+        self.control_rate = control_rate
 
         self.reference = reference.Reference()
+        self.frame_id = "map"
 
         self.ego_state = reference.Node()
         self.steering_angle = 0.0
@@ -46,9 +47,21 @@ class PID_Stanley:
         self.update_ego_state(odometry_msg)
 
         # TODO: Add timed callback
-        if(self.instant_control):
+        if(not self.control_rate):
             self.control()
         
+        return
+
+    def timer_callback(self, event):
+        
+        self.control()
+
+        return
+        
+    def steer_callback(self, jointstate_msg):
+
+        self.steering_angle = jointstate_msg.position[0]
+
         return
 
     def control(self):
@@ -59,12 +72,6 @@ class PID_Stanley:
         control_input = self.calculate_control(goal_node)
 
         self.publish_control(control_input)
-
-        return
-
-    def steer_callback(self, jointstate_msg):
-
-        self.steering_angle = jointstate_msg.position[0]
 
         return
 
