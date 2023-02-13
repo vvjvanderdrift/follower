@@ -80,7 +80,8 @@ class Reference():
         found_node = False
 
         look_over_time = .5
-        look_over_distance = ego_state.vx * look_over_time 
+        look_over_distance = max(5 , ego_state.vx * look_over_time)
+
 
         for node in path:
             dx = node.x-ego_state.x

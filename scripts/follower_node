@@ -10,10 +10,11 @@ if __name__ == '__main__':
     try:
 
         control_rate = 50 # Set to 0 for instant control as state message is arrived
+        ego_model = "dynamic_bicycle" # kinematic_bicycle or dynamic_bicycle
 
         rospy.init_node('follower', anonymous=True)
 
-        controller = controllers.PID_Stanley(control_rate)
+        controller = controllers.PID_Stanley(control_rate, ego_model)
 
         if(control_rate):
             rospy.Timer(rospy.Duration(1 / control_rate), controller.timer_callback)
