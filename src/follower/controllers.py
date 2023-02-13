@@ -26,11 +26,17 @@ class PID_Stanley:
 
         # Gains
         if(ego_model == "kinematic_bicycle"):
+            # self.Kp_long_speed = 3
+            # self.Kd_long_speed = 0
+            # self.K_stanley = 2
+            # self.Kp_long_accel = 5
+            # self.Kp_steer_rate = 8
+            # self.Kd_steer_rate = 0
             self.Kp_long_speed = 3
             self.Kd_long_speed = 0
-            self.K_stanley = 2
+            self.K_stanley = 1
             self.Kp_long_accel = 5
-            self.Kp_steer_rate = 8
+            self.Kp_steer_rate = 25
             self.Kd_steer_rate = 0
         elif(ego_model == "dynamic_bicycle"):
             self.Kp_long_speed = 3
