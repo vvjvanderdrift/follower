@@ -14,8 +14,7 @@ from follower import reference
 
 class PID_Stanley:
 
-    def __init__(self, control_rate, ego_model) -> None:
-        print("Initializing PID controller")
+    def __init__(self, control_rate, ego_model, control_inputs) -> None:
 
         self.control_rate = control_rate
 
@@ -23,22 +22,30 @@ class PID_Stanley:
         self.frame_id = "map"
 
         self.ego_model = ego_model
+        self.control_inputs = control_inputs
 
         # Gains
-        if(ego_model == "kinematic_bicycle"):
-            # self.Kp_long_speed = 3
-            # self.Kd_long_speed = 0
-            # self.K_stanley = 2
-            # self.Kp_long_accel = 5
-            # self.Kp_steer_rate = 8
-            # self.Kd_steer_rate = 0
+        if(ego_model == "kinematic_bicycle" and self.control_inputs == "ax_omega"):
             self.Kp_long_speed = 3
             self.Kd_long_speed = 0
             self.K_stanley = 1
             self.Kp_long_accel = 5
             self.Kp_steer_rate = 25
             self.Kd_steer_rate = 0
+        elif(ego_model == "kinematic_bicycle" and self.control_inputs == "vx_delta"):
+            self.Kp_long_speed = 1
+            self.Kd_long_speed = 0
+            self.K_stanley = 1
+            self.Kp_long_accel = 0
+            self.Kp_steer_rate = 0
+            self.Kd_steer_rate = 0
         elif(ego_model == "dynamic_bicycle"):
+            # self.Kp_long_speed = 3
+            # self.Kd_long_speed = 0
+            # self.K_stanley = 1
+            # self.Kp_long_accel = 5
+            # self.Kp_steer_rate = 25
+            # self.Kd_steer_rate = 0
             self.Kp_long_speed = 3
             self.Kd_long_speed = 0
             self.K_stanley = 1
@@ -149,17 +156,22 @@ class PID_Stanley:
         max_steering_angle = 30 * np.pi/180
         control_steering_angle = min(control_steering_angle, max_steering_angle)
         control_steering_angle = max(control_steering_angle, -max_steering_angle)
-        
-        # Longitudinal acceleration PID 
-        control_acceleration = self.Kp_long_accel * (control_speed - self.ego_state.vx)
 
-        # Steering angle rate PID 
-        error_steering_angle = (control_steering_angle - self.steering_angle)
-        d_error_steering_angle = error_steering_angle - self.previous_error_steering_angle
-        control_steering_rate = self.Kp_steer_rate * error_steering_angle + self.Kd_steer_rate * d_error_steering_angle
+        if(self.control_inputs == "vx_delta"):
+            control_input = [control_speed, control_steering_angle]
 
-        # control_input = [speed, steering_angle]
-        control_input = [control_acceleration, control_steering_rate]
+        elif(self.control_inputs == "ax_omega"):
+            
+            # Longitudinal acceleration PID 
+            control_acceleration = self.Kp_long_accel * (control_speed - self.ego_state.vx)
+
+            # Steering angle rate PID 
+            error_steering_angle = (control_steering_angle - self.steering_angle)
+            d_error_steering_angle = error_steering_angle - self.previous_error_steering_angle
+            control_steering_rate = self.Kp_steer_rate * error_steering_angle + self.Kd_steer_rate * d_error_steering_angle
+
+            # control_input = [speed, steering_angle]
+            control_input = [control_acceleration, control_steering_rate]
 
         # rospy.logwarn(f'Control speed: {control_speed}, acceleration: {control_acceleration}, steering angle: {control_steering_angle}')
 
@@ -170,7 +182,8 @@ class PID_Stanley:
         self.steering_angle_reference_pub.publish(Float32(control_steering_angle * 180 / np.pi))
 
         self.previous_error_x_ego = error_x_ego
-        self.previous_error_steering_angle = error_steering_angle
+        if(self.control_inputs == "ax_omega"):
+            self.previous_error_steering_angle = error_steering_angle
 
         return control_input
 

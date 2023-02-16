@@ -2,7 +2,7 @@
 
 <launch>
 
-    <node pkg="follower" type="follower_node" name="follower_node"/>
+    <node pkg="follower" type="follower_node" name="follower_node" output="screen" required="True"/>
 
     <include file="$(find simple_sim)/launch/simple_sim_rviz.launch"/>
 
