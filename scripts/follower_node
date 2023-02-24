@@ -9,8 +9,8 @@ if __name__ == '__main__':
     
     try:
 
-        control_rate = 0 # Set to 0 for instant control as state message is arrived
-        ego_model = "kinematic_bicycle" # kinematic_bicycle or dynamic_bicycle
+        control_rate = 100 # Set to 0 for instant control as state message is arrived
+        ego_model = "dynamic_bicycle" # kinematic_bicycle or dynamic_bicycle
         control_inputs = "ax_omega"
 
         rospy.init_node('follower', anonymous=True)

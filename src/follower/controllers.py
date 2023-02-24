@@ -6,8 +6,8 @@ import tf_conversions
 from std_msgs.msg import Float32
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
-from simple_sim.msg import KinematicBicycleControl
-from simple_sim.msg import DynamicBicycleControl
+from simple_sim.msg import BicycleControl
+# from simple_sim.msg import DynamicBicycleControl
 
 from follower import reference
 
@@ -64,10 +64,11 @@ class PID_Stanley:
 
         rospy.Subscriber(self.state_topic, Odometry, self.odometry_callback)
         rospy.Subscriber('/movebox/front_left_steer_joint', JointState, self.steer_callback)
-        if(self.ego_model == "kinematic_bicycle"):
-            self.control_pub = rospy.Publisher(self.control_topic, KinematicBicycleControl, queue_size=1)
-        elif(self.ego_model == "dynamic_bicycle"):
-            self.control_pub = rospy.Publisher(self.control_topic, DynamicBicycleControl, queue_size=1)
+        # if(self.ego_model == "kinematic_bicycle"):
+            # self.control_pub = rospy.Publisher(self.control_topic, KinematicBicycleControl, queue_size=1)
+        # elif(self.ego_model == "dynamic_bicycle"):
+        #     self.control_pub = rospy.Publisher(self.control_topic, DynamicBicycleControl, queue_size=1)
+        self.control_pub = rospy.Publisher(self.control_topic, BicycleControl, queue_size=1)
         self.speed_value_pub = rospy.Publisher('/value/speed', Float32, queue_size=1)
         self.steering_angle_value_pub = rospy.Publisher('/value/steering_angle', Float32, queue_size=1)
         self.speed_reference_pub = rospy.Publisher('/value/speed_reference', Float32, queue_size=1)
@@ -190,10 +191,11 @@ class PID_Stanley:
 
     def publish_control(self, control_input):
                 
-        if(self.ego_model == "kinematic_bicycle"):
-            control_msg = KinematicBicycleControl()
-        elif(self.ego_model == "dynamic_bicycle"):
-            control_msg = DynamicBicycleControl()
+        # if(self.ego_model == "kinematic_bicycle"):
+        #     control_msg = KinematicBicycleControl()
+        # elif(self.ego_model == "dynamic_bicycle"):
+        #     control_msg = DynamicBicycleControl()
+        control_msg = BicycleControl()
         control_msg.header.stamp = rospy.Time.now()
         control_msg.header.frame_id = self.frame_id
 
