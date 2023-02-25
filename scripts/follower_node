@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import argparse
+
 from follower import controllers
 
 import rospy
@@ -9,21 +11,32 @@ if __name__ == '__main__':
     
     try:
 
-        control_rate = 100 # Set to 0 for instant control as state message is arrived
-        ego_model = "dynamic_bicycle" # kinematic_bicycle or dynamic_bicycle
-        control_inputs = "ax_omega"
+        # Parse arguments from launch file
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-m', '--model', default='kinematic_bicycle', choices=['kinematic_bicycle', 'dynamic_bicycle'], 
+                            help='model to control', dest='model')
+        parser.add_argument('--control_input_symbols', default='jx_domega', choices=['jx_domega', 'ax_omega', 'ax_delta', 'vx_delta'],
+                            help='choose order of control inputs', dest='control_input_symbols')
+        parser.add_argument('--ctrl_dt', default='0.01', help='controller integration stepsize (s)', type=float,
+                            dest='ctrl_dt')
+        args = parser.parse_args(rospy.myargv()[1:])
+
+        
+        ctrl_dt = args.ctrl_dt # Set to 0 for instant control as state message is arrived
+        ego_model = args.model # kinematic_bicycle or dynamic_bicycle
+        control_input_symbols = args.control_input_symbols
 
         rospy.init_node('follower', anonymous=True)
-        rospy.loginfo(f"{rospy.get_name()} Starting control node at {control_rate} Hz with {ego_model} settings")
+        rospy.loginfo(f"{rospy.get_name()} Starting follower control node at {ctrl_dt}s interval with {ego_model} settings")
                 
-        controller = controllers.PID_Stanley(control_rate, ego_model, control_inputs)
+        controller = controllers.LocalMotionTracker(ctrl_dt, ego_model, control_input_symbols)
 
-        if(control_rate):
-            rospy.Timer(rospy.Duration(1 / control_rate), controller.timer_callback)
-            rospy.loginfo(f"Started timed control loop")
+        if(ctrl_dt):
+            rospy.Timer(rospy.Duration(ctrl_dt), controller.timer_callback)
+            rospy.loginfo(f"{rospy.get_name()} Started timed control loop")
 
         else:
-            rospy.loginfo(f"Started untimed control loop")
+            rospy.loginfo(f"{rospy.get_name()} Started untimed control loop")
         rospy.spin()
 
     except rospy.ROSInterruptException:

@@ -2,13 +2,26 @@
 
 <launch>
 
-    <node pkg="follower" type="follower_node" name="follower_node" output="screen" required="True"/>
+    <arg name="model" default="kinematic_bicycle"/>
+    <arg name="control_input_symbols" default="ax_omega"/>
+    <arg name="ctrl_dt" default="0.1"/>
 
-    <include file="$(find simple_sim)/launch/simple_sim_rviz.launch"/>
+    <node pkg="follower" type="follower_node" name="follower_node" cwd="node" output="screen" required="True"
+          args="-m $(arg model) --control_input_symbols $(arg control_input_symbols) --ctrl_dt $(arg ctrl_dt)"/>
+
+    <include file="$(find simple_sim)/launch/simple_sim.launch">
+        <arg name="model" value="$(arg model)"/>
+        <arg name="ctrl_dt" default="$(arg ctrl_dt)"/>
+        <arg name="control_input_symbols" value="$(arg control_input_symbols)"/>
+        <arg name="external_controller" value="true"/>
+
+    </include>
 
     <!-- Run rqt_plot -->
     <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot_tires_forces_absolute" args=" /value/Fyf_linear, /value/Fyf_dugoff,/value/Fyr_linear, /value/Fyr_dugoff"/>
     <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot_tires_forces_relative" args=" /value/Fyf_relative, /value/Fyr_relative"/>
     <!-- <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot_steering_angle" args=" /value/steering_angle, /value/steering_angle_reference"/> -->
   
+    <include file="$(find roadmap)/launch/roadmap.launch"/>
+
 </launch>
