@@ -2,9 +2,10 @@
 
 import argparse
 
+import rospy
+
 from follower import controllers
 
-import rospy
 
 
 if __name__ == '__main__':

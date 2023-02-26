@@ -11,6 +11,10 @@ from lmpcc_msgs.msg import Control
 
 from follower import reference
 
+from dynamic_reconfigure.server import Server
+from follower.cfg import DynamicReconfigureConfig
+
+
 class LocalMotionTracker:
     # This is a follower which takes the reference inputs calculated by the MPC planning module and tracks these signals to produce a high-frequency signal for the actuators
 
@@ -24,7 +28,11 @@ class LocalMotionTracker:
         self.mpc_optimal_control_symbols = 'ax_omega'
 
         self.mpc_optimal_controls = Control(throttle=0.0,steer=0.0)
-        self.current_state = [0.0, 0.0] # Should be same quantity (or symbols) as 'mpc_optimal_control_symbols'
+        self.state_throttle = 0.0 # Should be same quantity (or symbols) as 'mpc_optimal_control_symbols'
+        self.state_steer = 0.0 # Should be same quantity (or symbols) as 'mpc_optimal_control_symbols'
+
+        self.Kp_throttle = rospy.get_param("/Kp_throttle")
+        self.Kp_steer = rospy.get_param("/Kp_steer")
 
         self.mpc_optimal_controls_topic = "/lmpcc"
         self.control_inputs_topic = "/" + self.ego_model + "/control"
@@ -39,6 +47,8 @@ class LocalMotionTracker:
         self.ax_control_pub = rospy.Publisher('/control/ax', Float32, queue_size=1)
         self.omega_control_pub = rospy.Publisher('/control/omega', Float32, queue_size=1)
 
+        self.config_server = Server(DynamicReconfigureConfig, self.config_callback)
+
         pass
 
     def mpc_optimal_controls_callback(self, mpc_optimal_control_msg):
@@ -49,13 +59,13 @@ class LocalMotionTracker:
 
     def throttle_state_callback(self, throttle_state_msg):
         
-        self.current_state[0] = throttle_state_msg.data
+        self.state_throttle = throttle_state_msg.data
 
         return
 
     def steer_state_callback(self, steer_state_msg):
         
-        self.current_state[1] = steer_state_msg.data
+        self.state_steer = steer_state_msg.data
 
         return
 
@@ -67,22 +77,25 @@ class LocalMotionTracker:
     
     def control(self):
 
-        reference = np.array([self.mpc_optimal_controls.throttle,
-                     self.mpc_optimal_controls.steer])
+        reference_throttle = self.mpc_optimal_controls.throttle
+
+        reference_steer = self.mpc_optimal_controls.steer
         
-        state = np.array(self.current_state)
+        error_throttle = reference_throttle - self.state_throttle
+        error_steer = reference_steer - self.state_steer
 
-        error = reference - state
 
-        Kp = np.array([20.,20.])
+        Kp_throttle = self.Kp_throttle
+        Kp_steer = self.Kp_steer
 
-        control_input = Kp*error
-        control_input = control_input.tolist()
+        control_input_throttle = Kp_throttle*error_throttle
+        control_input_steer = Kp_steer*error_steer
+        control_input = [control_input_throttle, control_input_steer]
 
         self.publish_control(control_input)
 
-        self.ax_control_pub.publish(Float32(reference[0]))
-        self.omega_control_pub.publish(Float32(reference[1]))
+        self.ax_control_pub.publish(Float32(reference_throttle))
+        self.omega_control_pub.publish(Float32(reference_steer))
 
         return 
     
@@ -98,6 +111,16 @@ class LocalMotionTracker:
 
 
         return
+    
+    def config_callback(self, config, level):
+
+        rospy.loginfo(f"Reconfigure Request: Kp_throttle: {config.Kp_throttle}, Kp_steer: {config.Kp_steer}")
+        
+        self.Kp_throttle = config.Kp_throttle
+        self.Kp_steer = config.Kp_steer
+
+        return config
+
 
 class StanleyReferenceTracker:
     # This is a follower which takes a reference point (from e.g. a roadmap) and tracks this point using a longitudinal PID controller and lateral stanley controller
