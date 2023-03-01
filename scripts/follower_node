@@ -14,6 +14,8 @@ if __name__ == '__main__':
 
         # Parse arguments from launch file
         parser = argparse.ArgumentParser()
+        parser.add_argument('--architecture', default='no', choices=['no', 'pid', 'mpc-pid'], 
+                            help='choose follower architecture', dest='architecture')
         parser.add_argument('-m', '--model', default='kinematic_bicycle', choices=['kinematic_bicycle', 'dynamic_bicycle'], 
                             help='model to control', dest='model')
         parser.add_argument('--control_input_symbols', default='jx_domega', choices=['jx_domega', 'ax_omega', 'ax_delta', 'vx_delta'],
@@ -30,7 +32,12 @@ if __name__ == '__main__':
         rospy.init_node('follower', anonymous=True)
         rospy.loginfo(f"{rospy.get_name()} Starting follower control node at {ctrl_dt}s interval with {ego_model} settings")
                 
-        controller = controllers.LocalMotionTracker(ctrl_dt, ego_model, control_input_symbols)
+        if args.architecture == 'pid':
+            controller = controllers.StanleyReferenceTracker(ctrl_dt, ego_model, control_input_symbols)
+        elif args.architecture == 'mpc-pid':
+            controller = controllers.LocalMotionTracker(ctrl_dt, ego_model, control_input_symbols)
+        else:
+            raise IOError("Unsupported follower architecture, choose supported architecture")
 
         if(ctrl_dt):
             rospy.Timer(rospy.Duration(ctrl_dt), controller.timer_callback)

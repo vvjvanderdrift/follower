@@ -161,7 +161,7 @@ class StanleyReferenceTracker:
             self.Kd_long_speed = 0
             self.K_stanley = 1
             self.Kp_long_accel = 5
-            self.Kp_steer_rate = 25
+            self.Kp_steer_rate = 1.5
             self.Kd_steer_rate = 0
             
         self.ego_state = reference.Node()
@@ -255,7 +255,7 @@ class StanleyReferenceTracker:
         d_error_x_ego = error_x_ego - self.previous_error_x_ego
         control_speed = speed_ref + self.Kp_long_speed * error_x_ego + self.Kd_long_speed * d_error_x_ego
 
-        max_speed = 14
+        max_speed = 5
         control_speed = min(control_speed,max_speed)
 
         # Lateral Stanley

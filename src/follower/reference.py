@@ -79,7 +79,7 @@ class Reference():
         closest_node = Node(np.inf,np.inf,0)
         found_node = False
 
-        look_over_time = .5
+        look_over_time = 1.5
         look_over_distance = max(5 , ego_state.vx * look_over_time)
 
 
